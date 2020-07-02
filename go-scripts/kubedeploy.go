@@ -16,22 +16,61 @@ import (
 )
 
 func main() {
-	var kubeconfig *string
-	var ns, label, field, action, object, image string
-	var rc int
+	var (
+		kubeconfig                      *string
+		ns, label, field, object, image string
+		rc                              int
+	)
 	if home := homeDir(); home != "" {
 		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "absolute path to config file")
 	} else {
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to kubeconfig file")
 	}
-	flag.StringVar(&action, "action", "", "Action - get,create,update")
-	flag.StringVar(&object, "object", "", "kube object - pod,deployment,service")
-	flag.StringVar(&ns, "ns", "", "namespace")
-	flag.StringVar(&label, "label", "", "Label Selector")
-	flag.StringVar(&field, "field", "", "Field Selector")
-	flag.StringVar(&image, "image", "", "image name")
-	flag.IntVar(&rc, "rc", 2, "replica rount")
-	flag.Parse()
+	//flag.StringVar(&action, "action", "", "Action - get,create,update")
+	//sub commands based on action key-word
+	getAction := flag.NewFlagSet("get", flag.ExitOnError)
+	createAction := flag.NewFlagSet("create", flag.ExitOnError)
+	updateAction := flag.NewFlagSet("update", flag.ExitOnError)
+	deleteAction := flag.NewFlagSet("delete", flag.ExitOnError)
+	//flag pointers for get
+	getAction.StringVar(&object, "object", "", "kube object - pod,deployment,service")
+	getAction.StringVar(&ns, "ns", "", "namespace")
+	getAction.StringVar(&field, "field", "", "Field Selector")
+	getAction.StringVar(&label, "label", "", "Label Selector")
+	//flag pointers for create
+	createAction.StringVar(&object, "object", "", "kube object - pod,deployment,service")
+	createAction.StringVar(&ns, "ns", "", "namespace")
+	createAction.StringVar(&label, "label", "", "Label Selector")
+	//flag pointers for update
+	updateAction.StringVar(&object, "object", "", "kube object - pod,deployment,service")
+	updateAction.StringVar(&ns, "ns", "", "namespace")
+	updateAction.StringVar(&label, "label", "", "Label Selector")
+	updateAction.StringVar(&image, "image", "", "image name")
+	updateAction.IntVar(&rc, "rc", 2, "replica rount")
+	//flag pointers for delete
+	deleteAction.StringVar(&object, "object", "", "kube object - pod,deployment,service")
+	deleteAction.StringVar(&ns, "ns", "", "namespace")
+	deleteAction.StringVar(&label, "label", "", "Label Selector")
+	//check for action keyword
+	if len(os.Args) < 2 {
+		fmt.Println("one action key word required - get,create,update,delete")
+		os.Exit(1)
+	}
+
+	//parse flag arguments based on the action keyword
+	switch os.Args[1] {
+	case "get":
+		getAction.Parse(os.Args[2:])
+	case "create":
+		createAction.Parse(os.Args[2:])
+	case "update":
+		updateAction.Parse(os.Args[2:])
+	case "delete":
+		deleteAction.Parse(os.Args[2:])
+	default:
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
 
 	// use the current context in kubeconfig
 	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
@@ -45,17 +84,30 @@ func main() {
 		panic(err.Error())
 	}
 
-	if action == "get" && object == "pod" {
-		getPodDetails(clientset, ns, label, field)
-	} else if action == "create" && object == "deployment" {
-		createDeployment(clientset, ns, label)
-	} else if action == "update" && object == "deployment" {
-		updateDeployment(clientset, rc, ns, label, image)
-	} else if action == "delete" && object == "deployment" {
-		deleteDeployment(clientset, ns, label)
+	if getAction.Parsed() {
+		if object == "pod" {
+			getPodDetails(clientset, ns, label, field)
+		}
+	} else if createAction.Parsed() {
+		if object == "deployment" {
+			createDeployment(clientset, ns, label)
+		} else if object == "pod" {
+			createPod(clientset, ns, label)
+		}
+	} else if updateAction.Parsed() {
+		if object == "deployment" {
+			updateDeployment(clientset, rc, ns, label, image)
+		}
+	} else if deleteAction.Parsed() {
+		if object == "deployment" {
+			deleteDeployment(clientset, ns, label)
+		} else if object == "pod" {
+			deletePod(clientset, ns, label)
+		}
 	} else {
-		println("action undefined")
+		fmt.Println("missing action keyword")
 	}
+
 }
 
 func homeDir() string {
@@ -95,7 +147,7 @@ func createDeployment(clientset *kubernetes.Clientset, ns, label string) {
 	//create deployment spec
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: label + "web",
+			Name: label + "-web",
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: int32Ptr(2),
@@ -169,6 +221,53 @@ func deleteDeployment(clientset *kubernetes.Clientset, ns, label string) {
 		panic(err)
 	}
 	fmt.Println("Deleted deployment")
+}
+
+func createPod(clientset *kubernetes.Clientset, ns, label string) {
+	//create API connection
+	kubeapi := clientset.CoreV1()
+
+	//create Pod Spec
+	pod := &apiv1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: label + "-pod",
+		},
+		Spec: apiv1.PodSpec{
+			Containers: []apiv1.Container{
+				{
+					Name:  label + "-pod",
+					Image: "nginx:1.12",
+					Ports: []apiv1.ContainerPort{
+						{
+							Name:          "http",
+							Protocol:      apiv1.ProtocolTCP,
+							ContainerPort: 80,
+						},
+					},
+				},
+			},
+		},
+	}
+	fmt.Println("Creating Pod...")
+	result, err := kubeapi.Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("Created Pod %q\n", result.GetObjectMeta().GetName())
+}
+
+func deletePod(clientset *kubernetes.Clientset, ns, label string) {
+	//create API connection
+	kubeapi := clientset.CoreV1()
+	//set delete policy
+	deletePolicy := metav1.DeletePropagationForeground
+	//perform delete action
+	if err := kubeapi.Pods(ns).Delete(context.TODO(), label+"-pod", metav1.DeleteOptions{
+		PropagationPolicy: &deletePolicy,
+	}); err != nil {
+		panic(err)
+	}
+	fmt.Println("Deleted pod")
 }
 
 func int32Ptr(i int32) *int32 { return &i }

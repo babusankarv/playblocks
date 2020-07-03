@@ -1,0 +1,11 @@
+---
+- hosts: master
+  remote_user: admin
+
+  tasks:
+    - name: edit api server yaml file
+      lineinfile:
+        path: /tmp/api.yaml
+        line: "    - --insecure-bind-address=192.168.1.1"
+        insertafter: "    - --secure-port=6443"
+ 

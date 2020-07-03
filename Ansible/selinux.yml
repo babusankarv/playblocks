@@ -1,0 +1,13 @@
+---
+- hosts: master
+  remote_user: admin
+
+  tasks:
+    - name: disable selinux
+      become: yes
+      lineinfile:
+        path: /etc/selinux/config
+        regexp: '^SELINUX='
+        line: 'SELINUX=disabled'
+        backrefs: yes
+ 

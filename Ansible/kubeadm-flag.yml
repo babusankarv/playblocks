@@ -1,0 +1,12 @@
+---
+- hosts: master
+  remote_user: admin
+
+  tasks:
+    - name: enable readonly port 10255 for metricbeat
+      become: yes
+      lineinfile:
+        path: /var/lib/kubelet/kubeadm-flags.env
+        regexp: '^(KUBELET_KUBEADM_ARGS=\".*(?<!\"))'
+        line: '\1 --read-only-port=10255"'
+        backrefs: yes

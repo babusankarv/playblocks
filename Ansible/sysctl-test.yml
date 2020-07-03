@@ -1,0 +1,23 @@
+---
+- hosts: newnode
+  remote_user: test
+  become: yes
+  become_method: sudo
+
+  tasks:
+    - name: increase vm max_map_count
+      sysctl:
+        name: vm.max_map_count
+        value: '250000000'
+        sysctl_file: /etc/sysctl.conf
+        reload: yes
+
+    - name: increase kernel pid_max
+      sysctl:
+        name: kernel.pid_max
+        value: '4194303'
+        sysctl_file: /etc/sysctl.conf
+        reload: yes
+ 
+    - name: activate sysctl change
+      command: "sysctl -p"

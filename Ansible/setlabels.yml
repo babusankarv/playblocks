@@ -1,0 +1,17 @@
+---
+- hosts: master
+  remote_user: admin
+
+  vars:
+    master_ip: "{{ hostvars[groups['master'][0]]['ansible_default_ipv4'].address | default(groups['master'][0]) }}"
+
+  tasks:
+    - name: get node names
+      shell: "kubectl get nodes --no-headers|grep -v 'master'|awk '{print $1}'"
+      register: k8s_node_names
+
+    - name: set node label
+      shell: "kubectl  label nodes {{ item }} dedicated=common --overwrite"
+      with_items:
+        - "{{ k8s_node_names.stdout_lines }}"
+      

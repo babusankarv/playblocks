@@ -1,0 +1,18 @@
+---
+- hosts: newnode
+  remote_user: admin
+  become: yes
+  become_method: sudo
+
+  tasks:
+    - name: update nrpe config
+      replace:
+        path: /usr/local/nagios/etc/nrpe.cfg
+        regexp: '10.1.1.1'
+        replace: '10.1.1.2'
+        backup: yes
+
+    - name: restart nrpe
+      service:
+        name: nrpe
+        state: reloaded

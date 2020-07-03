@@ -1,0 +1,17 @@
+---
+- hosts: master
+  remote_user: admin
+
+  vars:
+    master_ip: "{{ hostvars[groups['master'][0]]['ansible_default_ipv4'].address | default(groups['master'][0]) }}"
+    location: 'IN'
+
+  tasks:
+    - name: set  toolchain mount entry
+      set_fact:
+        toolchain_mount_entry: "{{ 'toolchain.svr.com:/data/toolchain-branches /usr/local/toolchain-branches nfs ro,nfsvers=3,rsize=32768,wsize=32768,intr,noatime,soft,_netdev 0 2' if location == 'IN' else 'toolchainsvr:/data/toolchain /usr/local/toolchain-branches nfs ro,nfsvers=3,rsize=32768,wsize=32768,intr,noatime,soft,_netdev 0 2' }}"
+    - name: modify fstab
+      lineinfile:
+        path: /tmp/fstab
+        insertafter: 'EOF'
+        line: "{{ toolchain_mount_entry }}"

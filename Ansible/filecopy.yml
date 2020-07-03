@@ -1,0 +1,8 @@
+---
+- hosts: master
+  remote_user: admin
+
+  tasks:
+    - name: Copy kube config file to root HOME
+      become: yes
+      command: "cp /etc/kubernetes/admin.conf /root/.kube/config"

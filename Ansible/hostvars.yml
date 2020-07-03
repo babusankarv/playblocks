@@ -1,0 +1,9 @@
+---
+- hosts: master
+  remote_user: admin
+
+  tasks:
+    - debug: var=hostvars[groups['master'][0]]['ansible_default_ipv4'].address
+    - debug: var=hostvars[inventory_hostname]['ansible_default_ipv4']['address']
+    - debug: var=hostvars[groups['worker'][0]]['label']
+    - debug: var=hostvars[groups['worker'][0]]['hostname']
